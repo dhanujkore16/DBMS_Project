@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}StaySphere | Owner Dashboard{% endblock %}
+
+{% block content %}
+<section class="dashboard-hero">
+    <div>
+        <p class="eyebrow">Owner Dashboard</p>
+        <h1>Manage rooms, customers and bookings</h1>
+        <p class="hero-copy">This page handles the hotel owner operations and shows the DBMS-backed records.</p>
+    </div>
+    <nav class="hero-nav">
+        <a href="#overview">Overview</a>
+        <a href="#rooms">Rooms</a>
+        <a href="#customers">Customers</a>
+        <a href="#bookings">Bookings</a>
+    </nav>
+</section>
+
+<section id="overview" class="card-grid">
+    <article class="stat-card">
+        <span>Total Rooms</span>
+        <strong>{{ stats.rooms }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Total Customers</span>
+        <strong>{{ stats.customers }}</strong>
+    </article>
+    <article class="stat-card">
+        <span>Total Bookings</span>
+        <strong>{{ stats.bookings }}</strong>
+    </article>
+    <article class="stat-card accent">
+        <span>Available Rooms</span>
+        <strong>{{ stats.available_rooms }}</strong>
+    </article>
+</section>
+
+<section id="rooms" class="panel">
+    <div class="panel-heading">
+        <div>
+            <p class="section-tag">Room Table</p>
+            <h2>Add and manage rooms</h2>
+        </div>
+    </div>
+    <form class="data-form" method="post" action="{{ url_for('add_room') }}">
+        <input type="text" name="room_number" placeholder="Room Number" required>
+        <input type="text" name="room_type" placeholder="Room Type" required>
+        <input type="number" name="capacity" placeholder="Capacity" min="1" required>
+        <input type="number" name="price_per_night" placeholder="Price Per Night" min="0" required>
+        <select name="status" required>
+            <option value="Available">Available</option>
+            <option value="Booked">Booked</option>
+            <option value="Maintenance">Maintenance</option>
+        </select>
+        <input type="text" name="description" placeholder="Room Description" required>
+        <button type="submit">Add Room</button>
+    </form>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Room No.</th>
+                    <th>Type</th>
+                    <th>Capacity</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for room in rooms %}
+                <tr>
+                    <td>{{ room.room_id }}</td>
+                    <td>{{ room.room_number }}</td>
+                    <td>{{ room.room_type }}</td>
+                    <td>{{ room.capacity }}</td>
+                    <td>Rs. {{ room.price_per_night }}</td>
+                    <td><span class="pill {{ room.status|lower|replace(' ', '-') }}">{{ room.status }}</span></td>
+                    <td>{{ room.description }}</td>
+                    <td>
+                        <details>
+                            <summary>Edit</summary>
+                            <form class="inline-form" method="post" action="{{ url_for('update_room', room_id=room.room_id) }}">
+                                <input type="text" name="room_number" value="{{ room.room_number }}" required>
+                                <input type="text" name="room_type" value="{{ room.room_type }}" required>
+                                <input type="number" name="capacity" value="{{ room.capacity }}" min="1" required>
+                                <input type="number" name="price_per_night" value="{{ room.price_per_night }}" min="0" required>
+                                <select name="status" required>
+                                    <option value="Available" {% if room.status == 'Available' %}selected{% endif %}>Available</option>
+                                    <option value="Booked" {% if room.status == 'Booked' %}selected{% endif %}>Booked</option>
+                                    <option value="Maintenance" {% if room.status == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+                                </select>
+                                <input type="text" name="description" value="{{ room.description }}" required>
+                                <button type="submit">Save</button>
+                            </form>
+                        </details>
+                        <form method="post" action="{{ url_for('delete_room', room_id=room.room_id) }}" data-confirm="Delete this room?">
+                            <button class="danger" type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8">No room records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section id="customers" class="panel">
+    <div class="panel-heading">
+        <div>
+            <p class="section-tag">User Table</p>
+            <h2>Registered customers</h2>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Full Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>City</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for customer in customers %}
+                <tr>
+                    <td>{{ customer.user_id }}</td>
+                    <td>{{ customer.full_name }}</td>
+                    <td>{{ customer.username }}</td>
+                    <td>{{ customer.email }}</td>
+                    <td>{{ customer.phone }}</td>
+                    <td>{{ customer.city }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6">No customer registrations yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section id="bookings" class="panel">
+    <div class="panel-heading">
+        <div>
+            <p class="section-tag">Booking Table</p>
+            <h2>Update booking status</h2>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Booking ID</th>
+                    <th>Customer</th>
+                    <th>Room</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Guests</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr>
+                    <td>{{ booking.booking_id }}</td>
+                    <td>{{ booking.customer_name }}</td>
+                    <td>{{ booking.room_number }} ({{ booking.room_type }})</td>
+                    <td>{{ booking.check_in }}</td>
+                    <td>{{ booking.check_out }}</td>
+                    <td>{{ booking.guests_count }}</td>
+                    <td>Rs. {{ booking.total_amount }}</td>
+                    <td><span class="pill {{ booking.booking_status|lower|replace(' ', '-') }}">{{ booking.booking_status }}</span></td>
+                    <td>
+                        <form class="status-form" method="post" action="{{ url_for('update_booking_status', booking_id=booking.booking_id) }}">
+                            <select name="booking_status" required>
+                                <option value="Confirmed" {% if booking.booking_status == 'Confirmed' %}selected{% endif %}>Confirmed</option>
+                                <option value="Checked In" {% if booking.booking_status == 'Checked In' %}selected{% endif %}>Checked In</option>
+                                <option value="Checked Out" {% if booking.booking_status == 'Checked Out' %}selected{% endif %}>Checked Out</option>
+                                <option value="Cancelled" {% if booking.booking_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                            </select>
+                            <button type="submit">Update</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9">No bookings found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

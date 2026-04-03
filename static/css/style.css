@@ -1,0 +1,206 @@
+body {
+    margin: 0;
+    padding: 0;
+    background: #f5f5f5;
+    font-family: Arial, sans-serif;
+    color: #222;
+}
+
+a {
+    text-decoration: none;
+    color: #0056b3;
+}
+
+.site-header,
+.page-shell,
+.flash-stack {
+    width: 90%;
+    margin: auto;
+}
+
+.site-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    background: white;
+    border-bottom: 1px solid #ccc;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #222;
+}
+
+.brand-mark {
+    background: #2f6db3;
+    color: white;
+    padding: 10px;
+    font-weight: bold;
+}
+
+.brand p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.top-nav a,
+.button-link {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    background: white;
+}
+
+.top-nav .nav-button,
+.button-link,
+button {
+    background: #2f6db3;
+    color: white;
+    border: 1px solid #2f6db3;
+}
+
+.button-link.secondary,
+button.danger {
+    background: #666;
+    border-color: #666;
+}
+
+.page-shell {
+    padding: 20px 0;
+}
+
+.flash-message,
+.hero-copy-block,
+.hero-info-card,
+.auth-card,
+.panel,
+.info-card,
+.stat-card,
+.room-card {
+    background: white;
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.hero-panel,
+.dashboard-hero,
+.card-grid,
+.room-grid {
+    display: grid;
+    gap: 15px;
+}
+
+.hero-panel,
+.dashboard-hero {
+    grid-template-columns: 2fr 1fr;
+}
+
+.card-grid,
+.room-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.hero-actions,
+.hero-nav,
+.top-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.auth-layout {
+    display: flex;
+    justify-content: center;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 700px;
+}
+
+.auth-form,
+.data-form,
+.inline-form,
+.booking-form,
+.status-form {
+    display: grid;
+    gap: 10px;
+}
+
+.data-form,
+.inline-form {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+input,
+select,
+button {
+    padding: 8px;
+    font-size: 14px;
+}
+
+input,
+select {
+    width: 100%;
+    border: 1px solid #ccc;
+    background: white;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px;
+}
+
+th,
+td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: left;
+}
+
+.pill {
+    display: inline-block;
+    padding: 3px 8px;
+    border: 1px solid #ccc;
+    background: #eee;
+}
+
+.available,
+.confirmed,
+.checked-in {
+    color: green;
+}
+
+.booked,
+.checked-out {
+    color: darkgoldenrod;
+}
+
+.maintenance,
+.cancelled {
+    color: red;
+}
+
+@media (max-width: 768px) {
+    .site-header,
+    .hero-panel,
+    .dashboard-hero {
+        width: 95%;
+        grid-template-columns: 1fr;
+    }
+
+    .site-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
