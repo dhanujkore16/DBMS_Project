@@ -1,22 +1,228 @@
 from __future__ import annotations
 
-from typing import Any
+from functools import wraps
+from pathlib import Path
+from typing import Any, Callable
 
-from flask import Flask, flash, render_template, request, session
+import mysql.connector
+from flask import Flask, flash, g, redirect, render_template, request, session, url_for
 from mysql.connector import Error
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from auth_utils import dashboard_redirect, get_current_user, go, inject_session_user, login_required, role_required
-from db_utils import close_db, execute_write, fetch_customer_dashboard_data, fetch_one, fetch_owner_dashboard_data, init_db, sync_room_status
 
+SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
+MYSQL_CONFIG = {
+    "host": "localhost",
+    "user": "root",
+    "password": "Dhanuj@1356",
+    "database": "hotel_management",
+}
 OWNER_DASHBOARD_ROOMS = "owner_dashboard#rooms"
 OWNER_DASHBOARD_BOOKINGS = "owner_dashboard#bookings"
 CUSTOMER_DASHBOARD_BOOKINGS = "customer_dashboard#bookings"
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "hotel-management-demo-key"
-app.teardown_appcontext(lambda _: close_db())
-app.context_processor(inject_session_user)
+
+
+def raw_connection(use_database: bool = True) -> mysql.connector.MySQLConnection:
+    config = MYSQL_CONFIG if use_database else {k: v for k, v in MYSQL_CONFIG.items() if k != "database"}
+    return mysql.connector.connect(**config)
+
+
+def get_db() -> mysql.connector.MySQLConnection:
+    if "db" not in g:
+        g.db = raw_connection()
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(_: Any) -> None:
+    db = g.pop("db", None)
+    if db is not None and db.is_connected():
+        db.close()
+
+
+def go(endpoint: str) -> Any:
+    if "#" in endpoint:
+        name, anchor = endpoint.split("#", 1)
+        return redirect(f"{url_for(name)}#{anchor}")
+    return redirect(url_for(endpoint))
+
+
+def fetch_one(query: str, params: tuple[Any, ...] = ()) -> dict[str, Any] | None:
+    cursor = get_db().cursor(dictionary=True)
+    cursor.execute(query, params)
+    row = cursor.fetchone()
+    cursor.close()
+    return row
+
+
+def fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    cursor = get_db().cursor(dictionary=True)
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    cursor.close()
+    return rows
+
+
+def execute_write(query: str, params: Any = (), many: bool = False) -> None:
+    cursor = get_db().cursor()
+    if many:
+        cursor.executemany(query, params)
+    else:
+        cursor.execute(query, params)
+    get_db().commit()
+    cursor.close()
+
+
+def init_db() -> None:
+    db = raw_connection(use_database=False)
+    cursor = db.cursor()
+    statements = [part.strip() for part in SCHEMA_PATH.read_text(encoding="utf-8").split(";") if part.strip()]
+    for statement in statements:
+        cursor.execute(statement)
+    db.commit()
+    cursor.close()
+    db.close()
+
+    db = raw_connection()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT COUNT(*) AS total FROM users")
+    user_count = cursor.fetchone()["total"]
+    cursor.execute("SELECT COUNT(*) AS total FROM rooms")
+    room_count = cursor.fetchone()["total"]
+    cursor.execute("SELECT COUNT(*) AS total FROM bookings")
+    booking_count = cursor.fetchone()["total"]
+
+    if user_count == 0:
+        cursor.executemany(
+            """
+            INSERT INTO users (full_name, username, email, phone, city, password_hash, role)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                ("Riya Sharma", "owner", "owner@staysphere.com", "9876543210", "Jaipur", generate_password_hash("owner123"), "Owner"),
+                ("Aman Verma", "aman", "aman@example.com", "9123456780", "Delhi", generate_password_hash("aman123"), "Customer"),
+            ],
+        )
+        db.commit()
+
+    cursor.execute("SELECT user_id FROM users WHERE role = 'Owner' ORDER BY user_id LIMIT 1")
+    owner_id = cursor.fetchone()["user_id"]
+    cursor.execute("SELECT user_id FROM users WHERE role = 'Customer' ORDER BY user_id LIMIT 1")
+    customer_id = cursor.fetchone()["user_id"]
+
+    if room_count == 0:
+        cursor.executemany(
+            """
+            INSERT INTO rooms (owner_id, room_number, room_type, capacity, price_per_night, status, description)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                (owner_id, "101", "Single", 1, 2200, "Available", "Comfortable single room for solo travelers."),
+                (owner_id, "205", "Double", 2, 3500, "Available", "Spacious double room with breakfast included."),
+                (owner_id, "301", "Suite", 4, 6200, "Maintenance", "Premium suite with lounge area and city view."),
+            ],
+        )
+        db.commit()
+
+    if booking_count == 0:
+        cursor.execute(
+            """
+            INSERT INTO bookings (customer_id, room_id, check_in, check_out, guests_count, total_amount, booking_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (customer_id, 1, "2026-04-05", "2026-04-07", 1, 4400, "Confirmed"),
+        )
+        db.commit()
+
+    cursor.close()
+    db.close()
+
+
+def get_current_user() -> dict[str, Any] | None:
+    user_id = session.get("user_id")
+    return fetch_one("SELECT * FROM users WHERE user_id = %s", (user_id,)) if user_id else None
+
+
+@app.context_processor
+def inject_session_user() -> dict[str, Any]:
+    return {"current_user": get_current_user()}
+
+
+def login_required(view: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(view)
+    def wrapped_view(*args: Any, **kwargs: Any) -> Any:
+        if get_current_user() is None:
+            flash("Please log in first.")
+            return go("login")
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def role_required(role: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def decorator(view: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(view)
+        def wrapped_view(*args: Any, **kwargs: Any) -> Any:
+            user = get_current_user()
+            if user is None:
+                flash("Please log in first.")
+                return go("login")
+            if user["role"] != role:
+                flash("You do not have permission to open that page.")
+                return go("dashboard")
+            return view(*args, **kwargs)
+
+        return wrapped_view
+
+    return decorator
+
+
+def dashboard_redirect() -> Any:
+    user = get_current_user()
+    if user is None:
+        return go("login")
+    return go("owner_dashboard" if user["role"] == "Owner" else "customer_dashboard")
+
+
+def fetch_owner_dashboard_data() -> dict[str, Any]:
+    rooms = fetch_all("SELECT rooms.*, users.full_name AS owner_name FROM rooms JOIN users ON users.user_id = rooms.owner_id ORDER BY room_number")
+    customers = fetch_all("SELECT * FROM users WHERE role = 'Customer' ORDER BY user_id DESC")
+    bookings = fetch_all(
+        "SELECT bookings.*, users.full_name AS customer_name, users.phone AS customer_phone, rooms.room_number, rooms.room_type FROM bookings JOIN users ON users.user_id = bookings.customer_id JOIN rooms ON rooms.room_id = bookings.room_id ORDER BY bookings.booking_id DESC"
+    )
+    stats = {
+        "rooms": fetch_one("SELECT COUNT(*) AS total FROM rooms")["total"],
+        "customers": fetch_one("SELECT COUNT(*) AS total FROM users WHERE role = 'Customer'")["total"],
+        "bookings": fetch_one("SELECT COUNT(*) AS total FROM bookings")["total"],
+        "available_rooms": fetch_one("SELECT COUNT(*) AS total FROM rooms WHERE status = 'Available'")["total"],
+    }
+    return {"rooms": rooms, "customers": customers, "bookings": bookings, "stats": stats}
+
+
+def fetch_customer_dashboard_data(user_id: int) -> dict[str, Any]:
+    rooms = fetch_all(
+        "SELECT rooms.*, users.full_name AS owner_name FROM rooms JOIN users ON users.user_id = rooms.owner_id ORDER BY CASE rooms.status WHEN 'Available' THEN 0 ELSE 1 END, room_number"
+    )
+    bookings = fetch_all(
+        "SELECT bookings.*, rooms.room_number, rooms.room_type FROM bookings JOIN rooms ON rooms.room_id = bookings.room_id WHERE bookings.customer_id = %s ORDER BY bookings.booking_id DESC",
+        (user_id,),
+    )
+    return {"rooms": rooms, "bookings": bookings}
+
+
+def sync_room_status(room_id: int) -> None:
+    active_booking = fetch_one(
+        "SELECT booking_id FROM bookings WHERE room_id = %s AND booking_status IN ('Confirmed', 'Checked In') LIMIT 1",
+        (room_id,),
+    )
+    execute_write(
+        "UPDATE rooms SET status = CASE WHEN status = 'Maintenance' THEN status ELSE %s END WHERE room_id = %s",
+        ("Booked" if active_booking else "Available", room_id),
+    )
+
 
 try:
     init_db()
