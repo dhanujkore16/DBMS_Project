@@ -102,7 +102,7 @@ def init_db() -> None:
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             [
-                ("Riya Sharma", "owner", "owner@staysphere.com", "9876543210", "Jaipur", generate_password_hash("owner123"), "Owner"),
+                ("Riya Sharma", "owner", "owner@hotelrooms.com", "9876543210", "Jaipur", generate_password_hash("owner123"), "Owner"),
                 ("Aman Verma", "aman", "aman@example.com", "9123456780", "Delhi", generate_password_hash("aman123"), "Customer"),
             ],
         )
